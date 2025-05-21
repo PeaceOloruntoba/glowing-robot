@@ -1,4 +1,4 @@
-# full_sentiment_analysis_script.py
+# full_sentiment_analysis_script.py (modified for specific universities and output)
 
 import tweepy
 import pandas as pd
@@ -10,7 +10,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os # For environment variables
+import os
 
 # --- NLTK Downloads (Run once) ---
 try:
@@ -71,7 +71,6 @@ class TwitterScraper:
     def search_tweets(self, query, max_results=100, start_time=None, end_time=None):
         all_tweets = []
         try:
-            # You might need to implement pagination for more tweets
             response = self.client.search_recent_tweets(
                 query,
                 tweet_fields=["created_at", "text", "public_metrics"],
@@ -100,60 +99,63 @@ class TwitterScraper:
 # --- Main Execution Flow ---
 if __name__ == "__main__":
     # --- Configuration ---
-    # IMPORTANT: Set your Twitter Bearer Token as an environment variable
-    # e.g., export TWITTER_BEARER_TOKEN="your_token_here"
     bearer_token = os.environ.get("TWITTER_BEARER_TOKEN")
     if not bearer_token:
         print("WARNING: TWITTER_BEARER_TOKEN environment variable not set.")
         print("Please set it or replace with your token for actual data collection.")
-        # Using a dummy token for local testing if not set, but this won't work for actual API calls
         bearer_token = "DUMMY_TOKEN_REPLACE_ME" # This will cause an error if used for actual API calls
 
-    # Define keywords for Public and Private Universities (expand this list significantly)
+    # --- UPDATED KEYWORDS FOR UNILAG AND ANCHOR UNIVERSITY ---
     public_uni_keywords = [
-        "University of Ibadan infrastructure", "UI facilities", "UNILAG infrastructure",
-        "Ahmadu Bello University facilities", "OAU infrastructure",
-        "Federal University of Technology Akure facilities", "FUTA infrastructure",
-        "Nigerian public university buildings", "public university hostels Nigeria"
+        "UNILAG infrastructure", "University of Lagos facilities", "UNILAG hostels",
+        "UNILAG lecture halls", "UNILAG library", "UNILAG power supply", "UNILAG maintenance",
+        "UNILAG roads", "UNILAG environment", "UNILAG structures", "UNILAG buildings",
+        "UNILAG lecture theatre", "UNILAG laboratory", "UNILAG student facilities"
     ]
     private_uni_keywords = [
-        "Covenant University infrastructure", "CU facilities", "Redeemer's University infrastructure",
-        "Babcock University facilities", "American University of Nigeria infrastructure",
-        "private university facilities Nigeria", "Nigerian private university hostels"
+        "Anchor University infrastructure", "Anchor University Lagos facilities", "Anchor University hostels",
+        "Anchor University lecture halls", "Anchor University library", "Anchor University power supply",
+        "Anchor University maintenance", "Anchor University roads", "Anchor University environment",
+        "Anchor University structures", "Anchor University buildings", "Anchor University lecture theatre",
+        "Anchor University laboratory", "Anchor University student facilities", "AUL infrastructure",
+        "AUL facilities", "AUL hostels"
     ]
-    MAX_TWEETS_PER_QUERY = 50 # Adjust based on your needs and API limits
-    # You might want to define a time range for tweets, e.g., last 30 days
-    # end_time = datetime.datetime.now(datetime.timezone.utc)
-    # start_time = end_time - datetime.timedelta(days=30)
-
+    MAX_TWEETS_PER_QUERY = 100 # Maximum per API call for recent search
 
     # --- Phase 1: Data Collection ---
     print("--- Phase 1: Data Collection (from Twitter) ---")
     scraper = TwitterScraper(bearer_token)
     all_raw_tweets = []
 
+    # Collect for UNILAG
     for keyword in public_uni_keywords:
         tweets = scraper.search_tweets(keyword, max_results=MAX_TWEETS_PER_QUERY)
         for tweet in tweets:
             tweet['university_type'] = 'Public'
+            tweet['university_name'] = 'UNILAG' # Add specific university name
             all_raw_tweets.append(tweet)
+    print(f"Collected {len([t for t in all_raw_tweets if t.get('university_name') == 'UNILAG'])} tweets for UNILAG.")
 
+    # Collect for Anchor University
     for keyword in private_uni_keywords:
         tweets = scraper.search_tweets(keyword, max_results=MAX_TWEETS_PER_QUERY)
         for tweet in tweets:
             tweet['university_type'] = 'Private'
+            tweet['university_name'] = 'Anchor University' # Add specific university name
             all_raw_tweets.append(tweet)
+    print(f"Collected {len([t for t in all_raw_tweets if t.get('university_name') == 'Anchor University'])} tweets for Anchor University.")
 
     raw_df = pd.DataFrame(all_raw_tweets)
-    print(f"Collected {len(raw_df)} raw tweets.")
+    print(f"Total raw tweets collected: {len(raw_df)}")
     if raw_df.empty:
         print("No data collected. Exiting.")
-        exit() # Exit if no data is collected
+        exit()
 
     # --- Phase 2: Data Preprocessing and Structuring ---
     print("\n--- Phase 2: Data Preprocessing and Structuring ---")
     processed_df = raw_df.drop_duplicates(subset=['id']).copy()
-    processed_df = processed_df[['text', 'university_type']].copy() # Keep only necessary columns
+    # Keep university_name column
+    processed_df = processed_df[['text', 'university_type', 'university_name']].copy()
     processed_df.rename(columns={'text': 'infrastructure_feedback'}, inplace=True)
 
     # Social media specific cleaning
@@ -173,52 +175,132 @@ if __name__ == "__main__":
     df_with_sentiment = sentiment_analyzer.analyze_dataframe(processed_df.copy(), 'infrastructure_feedback')
 
     print("Sentiment analysis complete. Sample results:")
-    print(df_with_sentiment[['university_type', 'infrastructure_feedback', 'compound', 'sentiment_category']].head())
+    print(df_with_sentiment[['university_name', 'university_type', 'infrastructure_feedback', 'compound', 'sentiment_category']].head())
 
 
     # --- Phase 4: Result Aggregation and Presentation ---
-    print("\n--- Phase 4: Aggregating and Presenting Results ---")
+    # This entire block should be within the 'if not df_with_sentiment.empty:' check
+    if not df_with_sentiment.empty:
+        print("\n--- Phase 4: Aggregating and Presenting Results ---")
 
-    # Overall sentiment distribution
-    overall_sentiment_counts = df_with_sentiment['sentiment_category'].value_counts(normalize=True) * 100
-    print("\nOverall Sentiment Distribution:")
-    print(overall_sentiment_counts.round(2))
+        # --- Aggregation and Display (as before) ---
+        # Overall sentiment distribution
+        overall_sentiment_counts = df_with_sentiment['sentiment_category'].value_counts(normalize=True) * 100
+        print("\nOverall Sentiment Distribution:")
+        print(overall_sentiment_counts.round(2))
 
-    # Sentiment distribution by university type
-    sentiment_by_type = df_with_sentiment.groupby('university_type')['sentiment_category'].value_counts(normalize=True) * 100
-    print("\nSentiment Distribution by University Type:")
-    print(sentiment_by_type.unstack().round(2))
+        # Sentiment distribution by university type
+        sentiment_by_type = df_with_sentiment.groupby('university_type')['sentiment_category'].value_counts(normalize=True) * 100
+        print("\nSentiment Distribution by University Type:")
+        print(sentiment_by_type.unstack().round(2))
 
-    # Average compound score by university type
-    avg_compound_by_type = df_with_sentiment.groupby('university_type')['compound'].mean()
-    print("\nAverage Compound Sentiment Score by University Type:")
-    print(avg_compound_by_type.round(3))
+        # Average compound score by university type
+        avg_compound_by_type = df_with_sentiment.groupby('university_type')['compound'].mean()
+        print("\nAverage Compound Sentiment Score by University Type:")
+        print(avg_compound_by_type.round(3))
 
-    # Top/Bottom Tweets
-    print("\nTop 3 Most Positive Infrastructure Feedback (Overall):")
-    print(df_with_sentiment.sort_values(by='compound', ascending=False).head(3)[['university_type', 'infrastructure_feedback', 'compound']])
-    print("\nTop 3 Most Negative Infrastructure Feedback (Overall):")
-    print(df_with_sentiment.sort_values(by='compound', ascending=True).head(3)[['university_type', 'infrastructure_feedback', 'compound']])
+        # Sentiment distribution by specific university
+        sentiment_by_uni = df_with_sentiment.groupby('university_name')['sentiment_category'].value_counts(normalize=True) * 100
+        print("\nSentiment Distribution by Specific University:")
+        print(sentiment_by_uni.unstack().round(2))
 
-    # --- Visualizations ---
-    sns.set_style("whitegrid")
+        # Average compound score by specific university
+        avg_compound_by_uni = df_with_sentiment.groupby('university_name')['compound'].mean()
+        print("\nAverage Compound Sentiment Score by Specific University:")
+        print(avg_compound_by_uni.round(3))
 
-    plt.figure(figsize=(10, 6))
-    sns.countplot(data=df_with_sentiment, x='university_type', hue='sentiment_category', palette='viridis', order=['Public', 'Private'])
-    plt.title('Sentiment Towards Infrastructure: Public vs. Private Universities (Nigeria)')
-    plt.xlabel('University Type')
-    plt.ylabel('Number of Tweets')
-    plt.legend(title='Sentiment')
-    plt.tight_layout()
-    plt.show()
 
-    plt.figure(figsize=(8, 5))
-    sns.barplot(data=df_with_sentiment, x='university_type', y='compound', palette='coolwarm', errorbar=None)
-    plt.title('Average Compound Sentiment Score by University Type')
-    plt.xlabel('University Type')
-    plt.ylabel('Average Compound Score')
-    plt.ylim(-0.5, 0.5)
-    plt.tight_layout()
-    plt.show()
+        # Top/Bottom Tweets
+        print("\nTop 3 Most Positive Infrastructure Feedback (UNILAG):")
+        print(df_with_sentiment[df_with_sentiment['university_name'] == 'UNILAG'].sort_values(by='compound', ascending=False).head(3)[['infrastructure_feedback', 'compound']])
+        print("\nTop 3 Most Negative Infrastructure Feedback (UNILAG):")
+        print(df_with_sentiment[df_with_sentiment['university_name'] == 'UNILAG'].sort_values(by='compound', ascending=True).head(3)[['infrastructure_feedback', 'compound']])
 
-    print("\nAll phases complete. Check your console output and generated plots for results.")
+        print("\nTop 3 Most Positive Infrastructure Feedback (Anchor University):")
+        print(df_with_sentiment[df_with_sentiment['university_name'] == 'Anchor University'].sort_values(by='compound', ascending=False).head(3)[['infrastructure_feedback', 'compound']])
+        print("\nTop 3 Most Negative Infrastructure Feedback (Anchor University):")
+        print(df_with_sentiment[df_with_sentiment['university_name'] == 'Anchor University'].sort_values(by='compound', ascending=True).head(3)[['infrastructure_feedback', 'compound']])
+
+
+        # --- Saving Results to Files ---
+        output_folder = "sentiment_results"
+        os.makedirs(output_folder, exist_ok=True) # Create folder if it doesn't exist
+
+        # 1. Save the detailed DataFrame (df_with_sentiment)
+        # As CSV:
+        output_csv_path = os.path.join(output_folder, "unilag_anchor_university_sentiment_analysis_detailed.csv")
+        df_with_sentiment.to_csv(output_csv_path, index=False)
+        print(f"\nDetailed sentiment analysis results saved to: {output_csv_path}")
+
+        # As XLSX (requires openpyxl)
+        # You might need to install openpyxl if you haven't already: pip install openpyxl
+        output_xlsx_path = os.path.join(output_folder, "unilag_anchor_university_sentiment_analysis_detailed.xlsx")
+        df_with_sentiment.to_excel(output_xlsx_path, index=False, sheet_name="Detailed Sentiment")
+        print(f"Detailed sentiment analysis results saved to: {output_xlsx_path}")
+
+        # 2. Save Summary Statistics to a separate Excel file with multiple sheets
+        summary_xlsx_path = os.path.join(output_folder, "unilag_anchor_university_sentiment_summary.xlsx")
+        with pd.ExcelWriter(summary_xlsx_path) as writer:
+            overall_sentiment_counts.to_excel(writer, sheet_name='Overall Sentiment Distribution')
+            sentiment_by_type.to_excel(writer, sheet_name='Sentiment by Type')
+            avg_compound_by_type.to_excel(writer, sheet_name='Avg Compound by Type')
+            sentiment_by_uni.to_excel(writer, sheet_name='Sentiment by University Name')
+            avg_compound_by_uni.to_excel(writer, sheet_name='Avg Compound by University Name')
+        print(f"Summary sentiment statistics saved to: {summary_xlsx_path}")
+
+
+        # --- Visualizations (as before) ---
+        sns.set_style("whitegrid")
+
+        # Plot 1: Sentiment Distribution by University Type
+        plt.figure(figsize=(10, 6))
+        sns.countplot(data=df_with_sentiment, x='university_type', hue='sentiment_category', palette='viridis', order=['Public', 'Private'])
+        plt.title('Sentiment Towards Infrastructure: Public (UNILAG) vs. Private (Anchor University)')
+        plt.xlabel('University Type')
+        plt.ylabel('Number of Tweets')
+        plt.legend(title='Sentiment')
+        plt.tight_layout()
+        # Save the plot
+        plt.savefig(os.path.join(output_folder, "sentiment_by_university_type_plot.png"))
+        plt.show()
+
+        # Plot 2: Average Compound Sentiment Score by University Type
+        plt.figure(figsize=(8, 5))
+        sns.barplot(data=df_with_sentiment, x='university_type', y='compound', palette='coolwarm', errorbar=None)
+        plt.title('Average Compound Sentiment Score by University Type')
+        plt.xlabel('University Type')
+        plt.ylabel('Average Compound Score')
+        plt.ylim(-0.5, 0.5)
+        plt.tight_layout()
+        # Save the plot
+        plt.savefig(os.path.join(output_folder, "avg_compound_by_university_type_plot.png"))
+        plt.show()
+
+        # Plot 3: Sentiment Distribution by Specific University
+        plt.figure(figsize=(10, 6))
+        sns.countplot(data=df_with_sentiment, x='university_name', hue='sentiment_category', palette='viridis', order=['UNILAG', 'Anchor University'])
+        plt.title('Sentiment Towards Infrastructure: UNILAG vs. Anchor University')
+        plt.xlabel('University Name')
+        plt.ylabel('Number of Tweets')
+        plt.legend(title='Sentiment')
+        plt.tight_layout()
+        # Save the plot
+        plt.savefig(os.path.join(output_folder, "sentiment_by_specific_university_plot.png"))
+        plt.show()
+
+        # Plot 4: Average Compound Sentiment Score by Specific University
+        plt.figure(figsize=(8, 5))
+        sns.barplot(data=df_with_sentiment, x='university_name', y='compound', palette='coolwarm', errorbar=None, order=['UNILAG', 'Anchor University'])
+        plt.title('Average Compound Sentiment Score by Specific University')
+        plt.xlabel('University Name')
+        plt.ylabel('Average Compound Score')
+        plt.ylim(-0.5, 0.5)
+        plt.tight_layout()
+        # Save the plot
+        plt.savefig(os.path.join(output_folder, "avg_compound_by_specific_university_plot.png"))
+        plt.show()
+
+        print("\nAll phases complete. Check your console output, generated plots, and 'sentiment_results' folder for output files.")
+    else: # This 'else' correctly belongs to the 'if not df_with_sentiment.empty:' check for Phase 4
+        print("No data to aggregate, visualize, or save. Please check previous phases.")
+        
