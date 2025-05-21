@@ -99,7 +99,7 @@ class TwitterScraper:
 # --- Main Execution Flow ---
 if __name__ == "__main__":
     # --- Configuration ---
-    bearer_token = "AAAAAAAAAAAAAAAAAAAAAL2B1wEAAAAAEFNmMM9puWjDYkz1vfZYH3AVQUQ%3Deu89HpIx4aaBecLBTr54ZqL9bBdnaGGtPIvHBJAeICqaqOHiCR"
+    bearer_token = "AAAAAAAAAAAAAAAAAAAAAL2B1wEAAAAALdWbczUI4%2B38yDeb9ztZ27XlD8k%3DHHlZOJVEmzt1mjYtALN7OGotmWMXnGIvxv4Nxtg3iULdA6ful3"
     if not bearer_token:
         print("WARNING: TWITTER_BEARER_TOKEN environment variable not set.")
         print("Please set it or replace with your token for actual data collection.")
