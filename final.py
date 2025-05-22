@@ -1,282 +1,177 @@
-# import tweepy
-# import pandas as pd
-# import nltk
-# from nltk.sentiment import SentimentIntensityAnalyzer
-# from nltk.tokenize import word_tokenize
-# from textblob import TextBlob
-# import re
-# import json
-# from datetime import datetime
-# import pymongo
-# import redis
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-# from openpyxl import Workbook
-# from openpyxl.chart import BarChart, Reference
-# 
-# # Download required NLTK data
-# nltk.download('vader_lexicon')
-# nltk.download('punkt')
-# 
-# class UniversitySentimentAnalyzer:
-#     def __init__(self):
-#         # Twitter API credentials
-#         self.consumer_key = 'yFhdFvUmrYKYWS58BpaUTQW8H'
-#         self.consumer_secret = 'uBDqkJnMF2VIZYgtfIyf3EzDl9rsIdbHgrIuYNvJ7tni2KwAfl'
-#         self.access_token = '1615778868824096768-SceLOd38jaBbvGNsNRC2xjSL8uRkiu'
-#         self.access_token_secret = 'ojoPCjU0HCs4kxOvk2bRKHLC8gJiZQLZ1QZg2ZdSY7FN7'
-#         
-#         # Initialize Twitter API
-#         auth = tweepy.OAuthHandler(self.consumer_key, self.consumer_secret)
-#         auth.set_access_token(self.access_token, self.access_token_secret)
-#         self.api = tweepy.API(auth)
-#         
-#         # Initialize sentiment analyzer
-#         self.sia = SentimentIntensityAnalyzer()
-#         
-#         # Connect to MongoDB
-#         self.mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-#         self.db = self.mongo_client["university_sentiments"]
-#         
-#         # Connect to Redis
-#         self.redis_client = redis.Redis(host='localhost', port=6379, db=0)
-# 
-#     def preprocess_text(self, text):
-#         """Clean and preprocess tweet text"""
-#         text = re.sub(r'https?://\S+', '', text)  # Remove URLs
-#         text = re.sub(r'@\w+', '', text)  # Remove mentions
-#         text = re.sub(r'#', '', text)  # Remove hashtags
-#         text = re.sub(r'\n', ' ', text)  # Replace newlines with spaces
-#         return text.strip()
-# 
-#     def fetch_tweets(self, query, count=100):
-#         """Fetch tweets for a specific query"""
-#         tweets = []
-#         try:
-#             for tweet in tweepy.Cursor(
-#                 self.api.search_tweets,
-#                 q=query,
-#                 lang='en',
-#                 result_type='recent'
-#             ).items(count):
-#                 processed_tweet = {
-#                     'text': self.preprocess_text(tweet.text),
-#                     'created_at': tweet.created_at,
-#                     'username': tweet.user.screen_name,
-#                     'location': tweet.user.location,
-#                     'source': 'twitter'
-#                 }
-#                 tweets.append(processed_tweet)
-#         except Exception as e:
-#             print(f"Error fetching tweets: {str(e)}")
-#         
-#         return tweets
-# 
-#     def analyze_sentiment(self, text):
-#         """Analyze sentiment using multiple methods"""
-#         # NLTK VADER
-#         nltk_scores = self.sia.polarity_scores(text)
-#         
-#         # TextBlob
-#         blob = TextBlob(text)
-#         polarity = blob.sentiment.polarity
-#         subjectivity = blob.sentiment.subjectivity
-#         
-#         return {
-#             'nltk_compound': nltk_scores['compound'],
-#             'nltk_pos': nltk_scores['pos'],
-#             'nltk_neg': nltk_scores['neg'],
-#             'nltk_neutral': nltk_scores['neu'],
-#             'textblob_polarity': polarity,
-#             'textblob_subjectivity': subjectivity
-#         }
-# 
-#     def store_data(self, university, tweets):
-#         """Store processed tweets in MongoDB"""
-#         collection = self.db[university]
-#         
-#         for tweet in tweets:
-#             sentiment_scores = self.analyze_sentiment(tweet['text'])
-#             tweet.update(sentiment_scores)
-#             
-#             # Store in MongoDB
-#             collection.insert_one(tweet)
-#             
-#             # Cache recent sentiment scores in Redis
-#             self.redis_client.hset(
-#                 f"{university}:sentiments",
-#                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-#                 json.dumps(sentiment_scores)
-#             )
-# 
-#     def generate_visualizations(self):
-#         """Generate visualizations for analysis"""
-#         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-#         
-#         for idx, university in enumerate(['Anchor University', 'University of Lagos']):
-#             collection = self.db[university.replace(" ", "_").lower()]
-#             tweets = list(collection.find())
-#             
-#             # Convert to DataFrame
-#             df = pd.DataFrame(tweets)
-#             
-#             # Sentiment distribution plot
-#             sns.histplot(data=df, x='nltk_compound', ax=axes[0, idx], bins=20)
-#             
-#             # Time series sentiment plot
-#             df['created_at'] = pd.to_datetime(df['created_at'])
-#             df.set_index('created_at').resample('D')['nltk_compound'].mean().plot(
-#                 ax=axes[1, idx], marker='o'
-#             )
-#             
-#         plt.tight_layout()
-#         return fig
-# 
-#     def export_to_excel(self):
-#         """Export analysis results to Excel"""
-#         wb = Workbook()
-#         ws = wb.active
-#         
-#         # Create header row
-#         headers = ['University', 'Tweet Text', 'Sentiment Score', 'Date']
-#         for i, header in enumerate(headers, 1):
-#             ws.cell(row=1, column=i, value=header)
-#         
-#         row = 2
-#         for university in ['Anchor University', 'University of Lagos']:
-#             collection = self.db[university.replace(" ", "_").lower()]
-#             tweets = list(collection.find())
-#             
-#             for tweet in tweets:
-#                 ws.cell(row=row, column=1, value=university)
-#                 ws.cell(row=row, column=2, value=tweet['text'])
-#                 ws.cell(row=row, column=3, value=tweet['nltk_compound'])
-#                 ws.cell(row=row, column=4, value=tweet['created_at'].strftime('%Y-%m-%d %H:%M:%S'))
-#                 row += 1
-#         
-#         # Add charts
-#         chart_ws = wb.create_sheet('Charts')
-#         
-#         # Create bar chart for average sentiments
-#         anchor_avg = self.db['anchor_university'].aggregate([
-#             {'$group': {'_id': None, 'avg_sentiment': {'$avg': '$nltk_compound'}}}
-#         ])[0]['avg_sentiment']
-#         
-#         unilag_avg = self.db['university_of_lagos'].aggregate([
-#             {'$group': {'_id': None, 'avg_sentiment': {'$avg': '$nltk_compound'}}}
-#         ])[0]['avg_sentiment']
-#         
-#         data = Reference(chart_ws, min_col=1, min_row=1, max_row=2)
-#         chart = BarChart()
-#         chart.add_data(data)
-#         chart_ws.add_chart(chart, "E2")
-#         
-#         wb.save('university_sentiment_analysis.xlsx')
-#         
-#         
-#         
-# # Initialize analyzer
-# analyzer = UniversitySentimentAnalyzer()
-# 
-# # Define search queries
-# queries = [
-#     '"Anchor University Lagos infrastructure" OR "Anchor University facilities"',
-#     '"University of Lagos infrastructure" OR "UNILAG facilities"'
-# ]
-# 
-# # Fetch and analyze tweets for both universities
-# for university, query in zip(['Anchor University', 'University of Lagos'], queries):
-#     print(f"\nFetching tweets for {university}...")
-#     tweets = analyzer.fetch_tweets(query=query, count=100)
-#     analyzer.store_data(university, tweets)
-# 
-# # Generate visualizations and export results
-# fig = analyzer.generate_visualizations()
-# plt.savefig('sentiment_analysis_plots.png')
-# analyzer.export_to_excel()
-
-
-
-
-import snscrape.modules.twitter as sntwitter
 import pandas as pd
 import nltk
-from nltk.sentiment import SentimentIntensityAnalyzer
-from textblob import TextBlob
-import re
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 import seaborn as sns
-from openpyxl import Workbook
+import re
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+import tweepy
+import uuid
+from datetime import datetime, timedelta
+import certifi
+import os
 
+# Set SSL certificate path
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+
+# Download required NLTK data
 nltk.download('vader_lexicon')
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
 
-class UniversitySentimentAnalyzer:
-    def __init__(self):
-        self.sia = SentimentIntensityAnalyzer()
-        self.universities = {
-            "Anchor University": '"Anchor University Lagos infrastructure" OR "Anchor University facilities"',
-            "University of Lagos": '"University of Lagos infrastructure" OR "UNILAG facilities"'
-        }
+# Initialize stop words and lemmatizer
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
 
-    def preprocess(self, text):
-        text = re.sub(r'https?://\S+', '', text)
-        text = re.sub(r'@\w+', '', text)
-        text = re.sub(r'#', '', text)
-        return text.strip()
+# X API credentials (replace with your own)
+API_KEY = "KzZ0NJVAKjdKHvxmkkEUlPIsl"
+API_SECRET = "JO8D3iQUgCBVTdNPf7s3fmuJCfUzOkyhEdhEBzTK8dJqBRk9CU"
+ACCESS_TOKEN = "1615778868824096768-HXrAl7O4Fen3FVDcIloDBlm3QF2kwr"
+ACCESS_TOKEN_SECRET = "1QAU5nNkDig0dkvAep2HWQcyLfKCte9ZKDWCHVhJ2biyQ"
 
-    def fetch_tweets(self, query, limit=100):
-        tweets = []
-        for i, tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
-            if i >= limit:
-                break
+# Authenticate with X API
+auth = tweepy.OAuthHandler(API_KEY, API_SECRET)
+auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+api = tweepy.API(auth, wait_on_rate_limit=True)
+
+# Function to preprocess text
+def preprocess_text(text):
+    if not isinstance(text, str):
+        return ""
+    # Remove URLs, mentions, hashtags, and special characters
+    text = re.sub(r'http\S+|@\w+|#\w+|[^a-zA-Z\s]', '', text)
+    # Convert to lowercase
+    text = text.lower()
+    # Tokenize
+    tokens = word_tokenize(text)
+    # Remove stop words and lemmatize
+    tokens = [lemmatizer.lemmatize(token) for token in tokens if token not in stop_words]
+    return ' '.join(tokens)
+
+# Function to infer university type from text
+def infer_university_type(text):
+    text = text.lower()
+    public_keywords = ['public university', 'state university', 'public college']
+    private_keywords = ['private university', 'private college', 'foundation university']
+    for keyword in public_keywords:
+        if keyword in text:
+            return 'public'
+    for keyword in private_keywords:
+        if keyword in text:
+            return 'private'
+    return 'unknown'
+
+# Scrape X posts using tweepy
+def scrape_x_posts(query, max_tweets=50, days_back=7):
+    tweets = []
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days_back)
+    try:
+        for tweet in tweepy.Cursor(api.search_tweets, q=query, lang="en", tweet_mode="extended").items(max_tweets):
+            text = tweet.full_text if hasattr(tweet, 'full_text') else tweet.text
             tweets.append({
-                "date": tweet.date,
-                "content": self.preprocess(tweet.content),
-                "username": tweet.user.username,
-                "location": tweet.user.location or "",
+                'text': text,
+                'date': tweet.created_at,
+                'username': tweet.user.screen_name
             })
-        return tweets
+    except Exception as e:
+        print(f"Error scraping for query '{query}': {e}")
+    return pd.DataFrame(tweets)
 
-    def analyze_sentiment(self, text):
-        scores = self.sia.polarity_scores(text)
-        blob = TextBlob(text)
-        return {
-            "compound": scores["compound"],
-            "pos": scores["pos"],
-            "neg": scores["neg"],
-            "neu": scores["neu"],
-            "polarity": blob.sentiment.polarity,
-            "subjectivity": blob.sentiment.subjectivity
-        }
+# Fallback sample data if scraping fails
+sample_data = {
+    'text': [
+        "The lecture halls in this private university are modern and well-equipped.",
+        "Public university infrastructure is outdated and needs repair.",
+        "Private uni has amazing libraries and study spaces!",
+        "The public uni's buildings are falling apart, very disappointing.",
+        "Great facilities at this private institution, love the new tech labs.",
+        "Public university lacks proper maintenance for classrooms."
+    ],
+    'date': [datetime.now()] * 6,
+    'username': ['user1', 'user2', 'user3', 'user4', 'user5', 'user6'],
+    'university_type': ['private', 'public', 'private', 'public', 'private', 'public']
+}
 
-    def run_analysis(self):
-        all_data = []
+# Queries for scraping
+queries = [
+    '"public university infrastructure"',
+    '"private university infrastructure"',
+    '"state university facilities"',
+    '"private college facilities"',
+    '"university campus maintenance"'
+]
 
-        for uni, query in self.universities.items():
-            print(f"Fetching tweets for {uni}...")
-            tweets = self.fetch_tweets(query)
-            for tweet in tweets:
-                sentiment = self.analyze_sentiment(tweet["content"])
-                all_data.append({
-                    "University": uni,
-                    "Date": tweet["date"],
-                    "Text": tweet["content"],
-                    **sentiment
-                })
+# Scrape data
+data_frames = []
+for query in queries:
+    df_temp = scrape_x_posts(query, max_tweets=50, days_back=7)
+    if not df_temp.empty:
+        data_frames.append(df_temp)
 
-        df = pd.DataFrame(all_data)
-        df.to_excel("university_sentiment_analysis.xlsx", index=False)
-        self.plot_sentiment(df)
-        print("Analysis complete and saved to Excel.")
+# Combine data or use sample data if scraping fails
+if data_frames:
+    df = pd.concat(data_frames, ignore_index=True)
+    df.drop_duplicates(subset='text', inplace=True)
+else:
+    print("No data scraped. Using sample dataset.")
+    df = pd.DataFrame(sample_data)
 
-    def plot_sentiment(self, df):
-        sns.set(style="whitegrid")
-        plt.figure(figsize=(12, 6))
-        sns.boxplot(x="University", y="compound", data=df)
-        plt.title("Sentiment Comparison (Compound Score)")
-        plt.savefig("sentiment_comparison.png")
-        plt.show()
+# Save raw scraped data
+df.to_csv('raw_scraped_data.csv', index=False)
 
-# Run the analysis
-analyzer = UniversitySentimentAnalyzer()
-analyzer.run_analysis()
+# Infer university type
+df['university_type'] = df['text'].apply(infer_university_type)
+
+# Filter out rows where university type is unknown
+df = df[df['university_type'] != 'unknown']
+
+# Preprocess text
+df['cleaned_text'] = df['text'].apply(preprocess_text)
+
+# Initialize VADER sentiment analyzer
+sid = SentimentIntensityAnalyzer()
+
+# Function to get sentiment
+def get_sentiment(text):
+    scores = sid.polarity_scores(text)
+    compound = scores['compound']
+    if compound > 0.05:
+        return 'positive'
+    elif compound < -0.05:
+        return 'negative'
+    else:
+        return 'neutral'
+
+# Apply sentiment analysis
+df['sentiment'] = df['cleaned_text'].apply(get_sentiment)
+df['compound_score'] = df['cleaned_text'].apply(lambda x: sid.polarity_scores(x)['compound'])
+
+# Aggregate sentiment by university type
+sentiment_summary = df.groupby(['university_type', 'sentiment']).size().unstack(fill_value=0)
+sentiment_summary['total'] = sentiment_summary.sum(axis=1)
+for sentiment in ['positive', 'negative', 'neutral']:
+    sentiment_summary[f'{sentiment}_percent'] = (sentiment_summary[sentiment] / sentiment_summary['total'] * 100).round(2)
+
+# Export results to XLSX
+output_file = f'sentiment_analysis_results_{uuid.uuid4()}.xlsx'
+df.to_excel(output_file, index=False, sheet_name='Raw_Data')
+with pd.ExcelWriter(output_file, mode='a', engine='openpyxl') as writer:
+    sentiment_summary.to_excel(writer, sheet_name='Summary')
+
+# Create a chart for sentiment distribution by university type
+plt.figure(figsize=(10, 6))
+sentiment_summary[['positive_percent', 'negative_percent', 'neutral_percent']].plot(kind='bar', stacked=True)
+plt.title('Sentiment Distribution by University Type')
+plt.xlabel('University Type')
+plt.ylabel('Percentage')
+plt.legend(title='Sentiment')
+plt.tight_layout()
+plt.savefig('sentiment_distribution.png')
+
+print(f"Raw data saved to 'raw_scraped_data.csv'")
+print(f"Results exported to {output_file}")
+print(f"Sentiment distribution plot saved as 'sentiment_distribution.png'")
