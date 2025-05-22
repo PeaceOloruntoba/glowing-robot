@@ -22,7 +22,7 @@ class UniversitySentimentAnalyzer:
     def __init__(self):
         # Twitter API credentials
         self.consumer_key = 'yFhdFvUmrYKYWS58BpaUTQW8H'
-        self.consumer_secret = 'your_consumer_secret_here'
+        self.consumer_secret = 'uBDqkJnMF2VIZYgtfIyf3EzDl9rsIdbHgrIuYNvJ7tni2KwAfl'
         self.access_token = '1615778868824096768-SceLOd38jaBbvGNsNRC2xjSL8uRkiu'
         self.access_token_secret = 'ojoPCjU0HCs4kxOvk2bRKHLC8gJiZQLZ1QZg2ZdSY7FN7'
         
