@@ -21,7 +21,7 @@ nltk.download('punkt')
 class UniversitySentimentAnalyzer:
     def __init__(self):
         # Twitter API credentials
-        self.consumer_key = 'your_consumer_key_here'
+        self.consumer_key = 'yFhdFvUmrYKYWS58BpaUTQW8H'
         self.consumer_secret = 'your_consumer_secret_here'
         self.access_token = '1615778868824096768-SceLOd38jaBbvGNsNRC2xjSL8uRkiu'
         self.access_token_secret = 'ojoPCjU0HCs4kxOvk2bRKHLC8gJiZQLZ1QZg2ZdSY7FN7'
