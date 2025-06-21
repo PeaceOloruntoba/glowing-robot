@@ -47,17 +47,15 @@ def preprocess_text(text):
     tokens = [lemmatizer.lemmatize(token) for token in tokens if token not in stop_words]
     return ' '.join(tokens)
 
-# Function to infer university type from text
+# Function to infer university type
 def infer_university_type(text):
+    if pd.isna(text):
+        return 'unknown'
     text = text.lower()
-    public_keywords = ['public university', 'state university', 'public college']
-    private_keywords = ['private university', 'private college', 'foundation university']
-    for keyword in public_keywords:
-        if keyword in text:
-            return 'public'
-    for keyword in private_keywords:
-        if keyword in text:
-            return 'private'
+    if 'private university' in text:
+        return 'private'
+    if 'public university' in text:
+        return 'public'
     return 'unknown'
 
 # Prepare training data from NLTK movie_reviews corpus
@@ -72,27 +70,14 @@ def prepare_training_data():
         data.append({'text': text, 'sentiment': label})
     return pd.DataFrame(data)
 
-# Sample university dataset
+# Sample dataset based on SENTIMENT ANALYSIS.csv structure
 sample_data = {
-    'text': [
-        "The lecture halls in this private university are modern and well-equipped.",
-        "Public university infrastructure is outdated and needs repair.",
-        "Private uni has amazing libraries and study spaces!",
-        "The public uni's buildings are falling apart, very disappointing.",
-        "Great facilities at this private institution, love the new tech labs.",
-        "Public university lacks proper maintenance for classrooms.",
-        "State university classrooms are spacious but old.",
-        "Private college campus is stunning, great investment in facilities.",
-        "Public uni needs better funding for infrastructure upgrades.",
-        "The private university's labs are top-notch, best I've seen.",
-        "Public university buildings are crumbling, it's embarrassing.",
-        "Private uni's new lecture halls are state-of-the-art!",
-        "State college facilities are underfunded and outdated.",
-        "Private institution has beautiful campus and modern amenities."
-    ],
-    'date': [pd.Timestamp.now()] * 14,
-    'username': [f'user{i}' for i in range(1, 15)],
-    'university_type': ['private', 'public', 'private', 'public', 'private', 'public', 'public', 'private', 'public', 'private', 'public', 'private', 'public', 'private']
+    'Timestamp': [pd.Timestamp('2025-06-03')] * 5,
+    'Username': [f'user{i}' for i in range(1, 6)],
+    'Kind of University': ['Private University', 'Public University', 'Private University', 'Public University', 'Private University'],
+    'My school renovates old building into modern buildings': ['Agree', 'Disagree', 'Strongly Agree', 'Strongly Disagree', 'Neutral'],
+    'My school ensures classroom capacity is strictly adhered to': ['Neutral', 'Disagree', 'Agree', 'Disagree', 'Strongly Agree'],
+    'Spacious, ventilated and well-lit classroom [How accessible is this infrastructure in your institution?]': [3, 1, 3, 0, 2]
 }
 
 # Train models
@@ -121,22 +106,41 @@ rf_metrics = {
 
 # Function to process data and generate results
 def process_data(df):
-    df['cleaned_text'] = df['text'].apply(preprocess_text)
+    # Identify opinion columns
+    opinion_columns = [col for col in df.columns if col.startswith('My school')]
+    
+    # Create text column by concatenating opinion responses
+    def create_text(row):
+        return ' '.join([f"{col}: {row[col]}" for col in opinion_columns if pd.notna(row[col])])
+    
+    df['text'] = df.apply(create_text, axis=1)
+    df['university_type'] = df['Kind of University'].apply(infer_university_type)
     df = df[df['university_type'] != 'unknown']
+    
+    # Preprocess text
+    df['cleaned_text'] = df['text'].apply(preprocess_text)
+    
+    # Predict sentiment
     X_test = vectorizer.transform(df['cleaned_text'])
     df['sentiment_svm'] = svm_model.predict(X_test)
     df['sentiment_rf'] = rf_model.predict(X_test)
     
     # Aggregate sentiment by university type (Random Forest)
-    sentiment_summary = df.groupby(['university_type', 'sentiment_rf']).size().unstack 
-    fill_value=0
+    sentiment_summary = df.groupby(['university_type', 'sentiment_rf']).size().unstack(fill_value=0)
     sentiment_summary['total'] = sentiment_summary.sum(axis=1)
     for sentiment in ['positive', 'negative']:
         sentiment_summary[f'{sentiment}_percent'] = (sentiment_summary.get(sentiment, 0) / sentiment_summary['total'] * 100).round(2)
     
+    # Aggregate infrastructure ratings
+    infra_columns = [
+        col for col in df.columns if 'How accessible is this infrastructure' in col
+    ]
+    infra_summary = df.groupby('university_type')[infra_columns].mean().round(2)
+    
     # Generate plot
     plt.figure(figsize=(10, 6))
-    sentiment_summary[['positive_percent', 'negative_percent']].plot(kind='bar', stacked=True, color=['#28a745', '#dc3545'])
+    sns.barplot(data=sentiment_summary[['positive_percent', 'negative_percent']].reset_index(),
+                   x='university_type', y='value', hue='variable')
     plt.title('Sentiment Distribution by University Type (Random Forest)')
     plt.xlabel('University Type')
     plt.ylabel('Percentage')
@@ -150,7 +154,7 @@ def process_data(df):
     plot_url = base64.b64encode(img.getvalue()).decode()
     plt.close()
     
-    return df, sentiment_summary, plot_url
+    return df, sentiment_summary, infra_summary, plot_url
 
 # Flask routes
 @app.route('/')
@@ -161,45 +165,45 @@ def index():
 def results():
     if request.method == 'POST':
         file = request.files.get('file')
-        if file and file.filename.endswith(('.csv', '.xlsx')):
+        if file and file.filename.endswith('.csv'):
             filename = secure_filename(file.filename)
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
             
             try:
-                if filename.endswith('.csv'):
-                    df = pd.read_csv(file_path)
-                else:
-                    df = pd.read_excel(file_path)
+                df = pd.read_csv(file_path)
                 
-                if 'text' not in df.columns or 'university_type' not in df.columns:
-                    return render_template('results.html', error="File must contain 'text' and 'university_type' columns")
+                required_columns = ['Timestamp', 'Kind of University']
+                if not all(col in df.columns for col in required_columns):
+                    return render_template('results.html', error="File must contain 'Timestamp' and 'Kind of University' columns")
                 
-                df, sentiment_summary, plot_url = process_data(df)
+                df, sentiment_summary, infra_summary, plot_url = process_data(df)
             except Exception as e:
                 return render_template('results.html', error=f"Error processing file: {str(e)}")
         else:
-            return render_template('results.html', error="Please upload a valid CSV or XLSX file")
+            return render_template('results.html', error="Please upload a valid CSV file")
     else:
         df = pd.DataFrame(sample_data)
         df.to_csv('raw_sample_data.csv', index=False)
-        df, sentiment_summary, plot_url = process_data(df)
+        df, sentiment_summary, infra_summary, plot_url = process_data(df)
     
     # Save results to XLSX
     output_file = f'sentiment_analysis_results_{uuid.uuid4()}.xlsx'
-    df.to_excel(output_file, index=False, sheet_name='Raw_Data')
-    with pd.ExcelWriter(output_file, mode='a', engine='openpyxl') as writer:
-        sentiment_summary.to_excel(writer, sheet_name='Summary')
+    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+        df[['Timestamp', 'Username', 'Kind of University', 'text', 'university_type', 'sentiment_svm', 'sentiment_rf']].to_excel(writer, sheet_name='Raw_Data', index=False)
+        sentiment_summary.to_excel(writer, sheet_name='Sentiment_Summary')
+        infra_summary.to_excel(writer, sheet_name='Infrastructure_Summary')
     
     # Prepare data for template
-    raw_data = df[['text', 'university_type', 'sentiment_svm', 'sentiment_rf']].to_dict(orient='records')
+    raw_data = df[['Timestamp', 'Kind of University', 'text', 'university_type', 'sentiment_svm', 'sentiment_rf']].to_dict(orient='records')
     summary_data = sentiment_summary.to_dict()
+    infra_data = infra_summary.to_dict()
     svm_accuracy = svm_metrics['accuracy']
     rf_accuracy = rf_metrics['accuracy']
     
     return render_template('results.html', raw_data=raw_data, summary_data=summary_data,
-                         plot_url=plot_url, svm_accuracy=svm_accuracy, rf_accuracy=rf_accuracy,
-                         output_file=output_file)
+                         infra_data=infra_data, plot_url=plot_url, svm_accuracy=svm_accuracy,
+                         rf_accuracy=rf_accuracy, output_file=output_file)
 
 @app.route('/download/<filename>')
 def download_file(filename):
@@ -207,3 +211,4 @@ def download_file(filename):
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
