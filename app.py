@@ -128,7 +128,8 @@ def process_data(df):
     df['sentiment_rf'] = rf_model.predict(X_test)
     
     # Aggregate sentiment by university type (Random Forest)
-    sentiment_summary = df.groupby(['university_type', 'sentiment_rf']).size().unstack fill_value=0)
+    sentiment_summary = df.groupby(['university_type', 'sentiment_rf']).size().unstack 
+    fill_value=0
     sentiment_summary['total'] = sentiment_summary.sum(axis=1)
     for sentiment in ['positive', 'negative']:
         sentiment_summary[f'{sentiment}_percent'] = (sentiment_summary.get(sentiment, 0) / sentiment_summary['total'] * 100).round(2)
