@@ -1,7 +1,6 @@
-text,date,username,university_type
-The lecture halls in this private university are modern and well-equipped.,2025-05-22 13:51:16.660935,user1,private
-Public university infrastructure is outdated and needs repair.,2025-05-22 13:51:16.660935,user2,public
-Private uni has amazing libraries and study spaces!,2025-05-22 13:51:16.660935,user3,private
-"The public uni's buildings are falling apart, very disappointing.",2025-05-22 13:51:16.660935,user4,public
-"Great facilities at this private institution, love the new tech labs.",2025-05-22 13:51:16.660935,user5,private
-Public university lacks proper maintenance for classrooms.,2025-05-22 13:51:16.660935,user6,public
+Timestamp,Username,Kind of University,My school renovates old building into modern buildings,My school ensures classroom capacity is strictly adhered to,"Spacious, ventilated and well-lit classroom [How accessible is this infrastructure in your institution?]"
+2025-06-03,user1,Private University,Agree,Neutral,3
+2025-06-03,user2,Public University,Disagree,Disagree,1
+2025-06-03,user3,Private University,Strongly Agree,Agree,3
+2025-06-03,user4,Public University,Strongly Disagree,Disagree,0
+2025-06-03,user5,Private University,Neutral,Strongly Agree,2
