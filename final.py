@@ -236,7 +236,7 @@ if __name__ == '__main__':
     
     # Load primary data (SENTIMENT ANALYSIS.csv)
     try:
-        df = pd.read_csv('SENTIMENT ANALYSIS.csv')
+        df = pd.read_csv('SENTIMENT_ANALYSIS.csv')
         if not all(col in df.columns for col in ['Timestamp', 'Kind of University']):
             raise ValueError("CSV must contain 'Timestamp' and 'Kind of University' columns")
         is_csv = True
