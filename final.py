@@ -16,18 +16,18 @@ import uuid
 import os
 from datetime import datetime
 
-# Download required NLTK data
+
 nltk.download('movie_reviews')
 nltk.download('punkt')
 nltk.download('punkt_tab')
 nltk.download('stopwords')
 nltk.download('wordnet')
 
-# Initialize stop words and lemmatizer
+
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
-# Function to preprocess text
+
 def preprocess_text(text):
     if not isinstance(text, str):
         return ""
@@ -37,7 +37,7 @@ def preprocess_text(text):
     tokens = [lemmatizer.lemmatize(token) for token in tokens if token not in stop_words]
     return ' '.join(tokens)
 
-# Function to infer university type
+
 def infer_university_type(text):
     if pd.isna(text):
         return 'unknown'
@@ -48,7 +48,7 @@ def infer_university_type(text):
         return 'public'
     return 'unknown'
 
-# Prepare training data from NLTK movie_reviews corpus
+
 def prepare_training_data():
     documents = [(list(movie_reviews.words(fileid)), category)
                  for category in movie_reviews.categories()
@@ -60,7 +60,7 @@ def prepare_training_data():
         data.append({'text': text, 'sentiment': label})
     return pd.DataFrame(data)
 
-# Synthetic X posts (secondary data)
+
 sample_data = pd.DataFrame({
     'created_at': [
         '2025-05-01 08:15:23', '2025-05-01 12:30:45', '2025-05-02 09:22:10', '2025-05-02 14:50:33',
@@ -149,7 +149,7 @@ sample_data = pd.DataFrame({
     ]
 })
 
-# Train models
+
 train_df = prepare_training_data()
 train_df['cleaned_text'] = train_df['text'].apply(preprocess_text)
 vectorizer = TfidfVectorizer(max_features=5000)
@@ -157,55 +157,55 @@ X_train = vectorizer.fit_transform(train_df['cleaned_text'])
 y_train = train_df['sentiment']
 X_train_split, X_val, y_train_split, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
-# SVM Model
+
 svm_model = SVC(kernel='linear', probability=True)
 svm_model.fit(X_train_split, y_train_split)
 svm_val_predictions = svm_model.predict(X_val)
 svm_metrics = classification_report(y_val, svm_val_predictions, output_dict=True)
 svm_accuracy = accuracy_score(y_val, svm_val_predictions)
 
-# Random Forest Model
+
 rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
 rf_model.fit(X_train_split, y_train_split)
 rf_val_predictions = rf_model.predict(X_val)
 rf_metrics = classification_report(y_val, rf_val_predictions, output_dict=True)
 rf_accuracy = accuracy_score(y_val, rf_val_predictions)
 
-# Function to process data and generate results
+
 def process_data(df, is_csv=True):
-    # Identify opinion and infrastructure columns for CSV
+    
     if is_csv:
         opinion_columns = [col for col in df.columns if col.startswith('My school')]
         infra_columns = [col for col in df.columns if 'How accessible is this infrastructure' in col]
-        # Create text column by concatenating opinion responses
+        
         def create_text(row):
             return ' '.join([f"{col}: {row[col]}" for col in opinion_columns if pd.notna(row[col])])
         df['text'] = df.apply(create_text, axis=1)
         df['university_type'] = df['Kind of University'].apply(infer_university_type)
         df = df[df['university_type'] != 'unknown']
-        # Aggregate infrastructure ratings
+        
         infra_summary = df.groupby('university_type')[infra_columns].mean().round(2)
     else:
-        # For X posts, use text directly
+        
         df['university_type'] = df['text'].apply(infer_university_type)
         df = df[df['university_type'] != 'unknown']
-        infra_summary = pd.DataFrame()  # No infrastructure ratings for X posts
+        infra_summary = pd.DataFrame()  
 
-    # Preprocess text
+    
     df['cleaned_text'] = df['text'].apply(preprocess_text)
     
-    # Predict sentiment
+    
     X_test = vectorizer.transform(df['cleaned_text'])
     df['sentiment_svm'] = svm_model.predict(X_test)
     df['sentiment_rf'] = rf_model.predict(X_test)
     
-    # Aggregate sentiment by university type (Random Forest)
+    
     sentiment_summary = df.groupby(['university_type', 'sentiment_rf']).size().unstack(fill_value=0)
     sentiment_summary['total'] = sentiment_summary.sum(axis=1)
     for sentiment in ['positive', 'negative']:
         sentiment_summary[f'{sentiment}_percent'] = (sentiment_summary.get(sentiment, 0) / sentiment_summary['total'] * 100).round(2)
     
-    # Generate plot
+    
     plt.figure(figsize=(10, 6))
     if not sentiment_summary.empty:
         melted_summary = pd.melt(
@@ -228,13 +228,13 @@ def process_data(df, is_csv=True):
     
     return df, sentiment_summary, infra_summary
 
-# Main execution
+
 if __name__ == '__main__':
-    # Create output directories
+    
     os.makedirs('Uploads', exist_ok=True)
     os.makedirs('static/images', exist_ok=True)
     
-    # Load primary data (SENTIMENT ANALYSIS.csv)
+    
     try:
         df = pd.read_csv('SENTIMENT_ANALYSIS.csv')
         if not all(col in df.columns for col in ['Timestamp', 'Kind of University']):
@@ -249,13 +249,13 @@ if __name__ == '__main__':
         df = sample_data
         is_csv = False
     
-    # Save raw data
+    
     df.to_csv('raw_data.csv', index=False)
     
-    # Process data
+    
     df, sentiment_summary, infra_summary = process_data(df, is_csv)
     
-    # Export results to XLSX
+    
     output_file = f'sentiment_analysis_results_{uuid.uuid4()}.xlsx'
     with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
         if is_csv:
@@ -266,7 +266,7 @@ if __name__ == '__main__':
         if not infra_summary.empty:
             infra_summary.to_excel(writer, sheet_name='Infrastructure_Summary')
     
-    # Print model evaluation metrics
+    
     print("\n=== Model Evaluation Metrics ===")
     print("\nSVM Model (Validation Set):")
     print(f"Accuracy: {svm_accuracy:.4f}")
@@ -286,7 +286,7 @@ if __name__ == '__main__':
     print(f"Recall (Negative): {rf_metrics['negative']['recall']:.4f}")
     print(f"F1-Score (Negative): {rf_metrics['negative']['f1-score']:.4f}")
     
-    # Print model training details
+    
     print("\n=== Model Training Details ===")
     print("Training Data: NLTK movie_reviews corpus (~2000 reviews, ~1000 positive, ~1000 negative)")
     print("Train-Test Split: 80% training (~1600 reviews), 20% validation (~400 reviews), random_state=42")
@@ -294,13 +294,13 @@ if __name__ == '__main__':
     print("SVM Parameters: Linear kernel, C=1.0")
     print("Random Forest Parameters: 100 estimators, max_depth=None, random_state=42")
     
-    # Print output file details
+    
     print("\n=== Output Files ===")
     print(f"Raw data saved to 'raw_data.csv'")
     print(f"Results exported to '{output_file}'")
     print(f"Sentiment distribution plot saved as 'sentiment_distribution.png'")
     
-    # Print summaries
+    
     print("\n=== Sentiment Summary ===")
     print(sentiment_summary)
     if not infra_summary.empty:
