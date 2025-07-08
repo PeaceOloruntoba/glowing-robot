@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<h2>Upload Survey CSV</h2>
+<form method="POST" enctype="multipart/form-data">
+    <div class="mb-3">
+        <input type="file" name="file" class="form-control" accept=".csv" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Upload & Analyze</button>
+</form>
+{% endblock %}
