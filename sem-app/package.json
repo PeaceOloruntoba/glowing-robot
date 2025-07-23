@@ -1,20 +1,21 @@
 {
   "name": "sem-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "A web application for sentiment analysis.",
   "license": "ISC",
-  "author": "",
+  "author": "Your Name/Organization",
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "chart.js": "^4.5.0",
-    "dotenv": "^17.2.0",
-    "express": "^5.1.0",
-    "express-handlebars": "^8.0.3",
-    "mongoose": "^8.16.4",
-    "multer": "^2.0.2"
+    "chart.js": "^4.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-handlebars": "^7.1.2",
+    "mongoose": "^8.4.4",
+    "multer": "^1.4.5-lts.1"
   }
 }
