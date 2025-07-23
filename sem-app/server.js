@@ -5,8 +5,8 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const exphbs = require('express-handlebars');
-const mongoose = require('mongoose'); // Import Mongoose
-const Analysis = require('./models/Analysis'); // Import the Analysis model
+const mongoose = require('mongoose');
+const Analysis = require('./models/Analysis');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -149,7 +149,7 @@ app.post('/upload', upload.single('dataset'), (req, res) => {
 
     pythonProcess.stderr.on('data', (data) => {
         pythonError += data.toString();
-        console.error(`Python stderr: ${data}`);
+        console.error(`Python stderr: ${data}`); // Log Python errors to Node.js console
     });
 
     pythonProcess.on('close', async (code) => {
@@ -160,6 +160,7 @@ app.post('/upload', upload.single('dataset'), (req, res) => {
 
         if (code !== 0) {
             console.error(`Python script exited with code ${code}`);
+            // Send the full pythonError back for more detailed parsing on frontend
             return res.status(500).json({ error: 'Analysis failed', details: pythonError });
         }
 
@@ -167,40 +168,30 @@ app.post('/upload', upload.single('dataset'), (req, res) => {
             // Python script should print paths/data in a parseable format (e.g., JSON)
             // For now, we'll assume it saves files with specific names and we'll parse stdout for the unique excel filename.
             const outputLines = pythonOutput.split('\n');
-            const excelFilenameLine = outputLines.find(line => line.startsWith('Output Excel file:'));
-            const chartFilenameLine = outputLines.find(line => line.startsWith('Sentiment distribution chart:'));
+            // Try to find the JSON output from the Python script
+            const jsonOutputStart = pythonOutput.indexOf('{');
+            const jsonOutputEnd = pythonOutput.lastIndexOf('}');
 
-            let excelFilename = null;
-            let chartFilename = null;
-            let sentimentSummaryFromPython = {};
-            let infraSummaryFromPython = {};
-            let modelMetricsFromPython = {};
-
-            if (excelFilenameLine) {
-                excelFilename = excelFilenameLine.split(': ')[1].trim();
-            }
-            if (chartFilenameLine) {
-                chartFilename = chartFilenameLine.split(': ')[1].trim();
-            }
-
-            // Attempt to parse any JSON output from Python (e.g., sentiment summary)
-            try {
-                const jsonOutputStart = pythonOutput.indexOf('{');
-                const jsonOutputEnd = pythonOutput.lastIndexOf('}');
-                if (jsonOutputStart !== -1 && jsonOutputEnd !== -1) {
-                    const jsonString = pythonOutput.substring(jsonOutputStart, jsonOutputEnd + 1);
-                    const parsedPythonData = JSON.parse(jsonString);
-                    sentimentSummaryFromPython = parsedPythonData.sentiment_summary || {};
-                    infraSummaryFromPython = parsedPythonData.infra_summary || {};
-                    modelMetricsFromPython = parsedPythonData.model_metrics || {};
+            let parsedPythonData = {};
+            if (jsonOutputStart !== -1 && jsonOutputEnd !== -1) {
+                const jsonString = pythonOutput.substring(jsonOutputStart, jsonOutputEnd + 1);
+                try {
+                    parsedPythonData = JSON.parse(jsonString);
+                } catch (jsonParseError) {
+                    console.warn("Could not parse JSON from Python stdout:", jsonParseError);
+                    // If JSON parsing fails, fall back to line-based parsing if needed, or rely on defaults
                 }
-            } catch (jsonParseError) {
-                console.warn("Could not parse JSON from Python stdout:", jsonParseError);
-                // Continue without JSON data if parsing fails
             }
+
+            const excelFilename = parsedPythonData.output_excel_file;
+            const chartFilename = parsedPythonData.chart_image_file;
+            const sentimentSummaryFromPython = parsedPythonData.sentiment_summary || {};
+            const infraSummaryFromPython = parsedPythonData.infra_summary || {};
+            const modelMetricsFromPython = parsedPythonData.model_metrics || {};
+
 
             if (!excelFilename || !chartFilename) {
-                return res.status(500).json({ error: 'Analysis completed but output files not clearly identified from Python script output.', pythonOutput });
+                return res.status(500).json({ error: 'Analysis completed but output files not clearly identified from Python script output. Check Python logs.', pythonOutput });
             }
 
             const excelRelativePath = path.join('analysis_files', excelFilename);
@@ -226,8 +217,8 @@ app.post('/upload', upload.single('dataset'), (req, res) => {
             });
 
         } catch (dbSaveError) {
-            console.error('Error saving analysis to database:', dbSaveError);
-            res.status(500).json({ error: 'Analysis complete but failed to save results to database.', details: dbSaveError.message });
+            console.error('Error saving analysis to database or processing Python output:', dbSaveError);
+            res.status(500).json({ error: 'Analysis complete but failed to process results or save to database.', details: dbSaveError.message });
         }
     });
 });
