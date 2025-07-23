@@ -1,0 +1,25 @@
+<section class="history-section">
+    <h2>Analysis History</h2>
+    {{#if analyses}}
+        <table class="analysis-table">
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>Upload Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each analyses}}
+                <tr>
+                    <td>{{this.originalFileName}}</td>
+                    <td>{{formatDate this.uploadDate}}</td>
+                    <td><a href="/analysis/{{this._id}}" class="btn btn-small">View Details</a></td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    {{else}}
+        <p>No past analyses found. Upload a dataset to get started!</p>
+    {{/if}}
+</section>
