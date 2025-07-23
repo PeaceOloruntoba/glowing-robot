@@ -1,0 +1,97 @@
+<section class="results-section">
+    <h2>Analysis Results for "{{analysis.originalFileName}}"</h2>
+    <p><strong>Analysis Date:</strong> {{formatDate analysis.uploadDate}}</p>
+
+    <div id="download-link-container">
+        <a id="downloadLink" href="/analysis_results/{{analysis.excelFilePath}}" download class="btn">Download Full Results (Excel)</a>
+    </div>
+
+    <div class="chart-container">
+        <h3>Sentiment Distribution</h3>
+        {{#if analysis.chartImagePath}}
+            <img id="sentimentChart" src="/analysis_results/{{analysis.chartImagePath}}" alt="Sentiment Distribution Chart">
+        {{else}}
+            <p class="no-chart-message">No chart available for this analysis.</p>
+        {{/if}}
+    </div>
+
+    {{#ifExists analysis.sentimentSummary}}
+    <h3>Sentiment Summary</h3>
+    <div class="summary-table-container">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>University Type</th>
+                    <th>Negative Count</th>
+                    <th>Positive Count</th>
+                    <th>Total</th>
+                    <th>Negative (%)</th>
+                    <th>Positive (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each analysis.sentimentSummary}}
+                <tr>
+                    <td>{{@key}}</td>
+                    <td>{{this.negative}}</td>
+                    <td>{{this.positive}}</td>
+                    <td>{{this.total}}</td>
+                    <td>{{this.negative_percent}}%</td>
+                    <td>{{this.positive_percent}}%</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+    {{/ifExists}}
+
+    {{#ifExists analysis.infraSummary}}
+    <h3>Infrastructure Accessibility Summary (Mean Scores)</h3>
+    <div class="summary-table-container">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>University Type</th>
+                    {{#each (lookup (lookup analysis.infraSummary @firstKey) @firstKey)}}
+                        <th>{{@key}}</th>
+                    {{/each}}
+                </tr>
+            </thead>
+            <tbody>
+                {{#each analysis.infraSummary}}
+                <tr>
+                    <td>{{@key}}</td>
+                    {{#each this}}
+                        <td>{{this}}</td>
+                    {{/each}}
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+    {{/ifExists}}
+
+    <h3>Model Evaluation Metrics (Validation Set)</h3>
+    <div class="metrics-container">
+        <div class="model-metrics">
+            <h4>SVM Model</h4>
+            <p><strong>Accuracy:</strong> {{analysis.modelMetrics.svm.accuracy}}</p>
+            <p><strong>Positive Precision:</strong> {{analysis.modelMetrics.svm.positive_precision}}</p>
+            <p><strong>Positive Recall:</strong> {{analysis.modelMetrics.svm.positive_recall}}</p>
+            <p><strong>Positive F1-Score:</strong> {{analysis.modelMetrics.svm.positive_f1_score}}</p>
+            <p><strong>Negative Precision:</strong> {{analysis.modelMetrics.svm.negative_precision}}</p>
+            <p><strong>Negative Recall:</strong> {{analysis.modelMetrics.svm.negative_recall}}</p>
+            <p><strong>Negative F1-Score:</strong> {{analysis.modelMetrics.svm.negative_f1_score}}</p>
+        </div>
+        <div class="model-metrics">
+            <h4>Random Forest Model</h4>
+            <p><strong>Accuracy:</strong> {{analysis.modelMetrics.rf.accuracy}}</p>
+            <p><strong>Positive Precision:</strong> {{analysis.modelMetrics.rf.positive_precision}}</p>
+            <p><strong>Positive Recall:</strong> {{analysis.modelMetrics.rf.positive_recall}}</p>
+            <p><strong>Positive F1-Score:</strong> {{analysis.modelMetrics.rf.positive_f1_score}}</p>
+            <p><strong>Negative Precision:</strong> {{analysis.modelMetrics.rf.negative_precision}}</p>
+            <p><strong>Negative Recall:</strong> {{analysis.modelMetrics.rf.negative_recall}}</p>
+            <p><strong>Negative F1-Score:</strong> {{analysis.modelMetrics.rf.negative_f1_score}}</p>
+        </div>
+    </div>
+</section>
