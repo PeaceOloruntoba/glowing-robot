@@ -1,0 +1,16 @@
+<section class="upload-section">
+    <h2>Welcome! Analyze Your Dataset</h2>
+    <p>Upload a CSV file containing text data for sentiment analysis.</p>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="dataset">Choose CSV File:</label>
+            <input type="file" id="dataset" name="dataset" accept=".csv" required>
+        </div>
+        <button type="submit">Upload and Analyze</button>
+    </form>
+    <div id="loading" class="hidden">
+        <p>Analyzing data... Please wait. This might take a moment depending on the dataset size.</p>
+        <div class="spinner"></div>
+    </div>
+    <div id="error-message" class="error-message hidden"></div>
+</section>
