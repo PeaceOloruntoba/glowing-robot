@@ -306,4 +306,3 @@ if __name__ == '__main__':
     if not infra_summary.empty:
         print("\n=== Infrastructure Summary ===")
         print(infra_summary)
-        
