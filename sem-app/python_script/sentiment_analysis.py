@@ -15,14 +15,30 @@ import seaborn as sns
 import uuid
 import os
 import sys
-import json # Import json to output structured data
+import json
 
-# NLTK Downloads (ensure these are run once, or uncomment if running for the first time)
-for corpus in ['movie_reviews', 'punkt', 'stopwords', 'wordnet']:
+# NLTK Downloads (run these manually once during setup, or handle robustly)
+# This block attempts to check and download. If it fails, it prints an error and exits.
+required_nltk_corpora = ['movie_reviews', 'punkt', 'stopwords', 'wordnet']
+for corpus in required_nltk_corpora:
     try:
+        # Check if the corpus is already available
         nltk.data.find(f'corpora/{corpus}' if corpus in ['movie_reviews', 'stopwords', 'wordnet'] else f'tokenizers/{corpus}')
-    except nltk.downloader.DownloadError:
-        nltk.download(corpus)
+        sys.stdout.write(f"PROGRESS: NLTK resource '{corpus}' found.\n")
+        sys.stdout.flush()
+    except LookupError:
+        sys.stderr.write(f"PROGRESS: NLTK resource '{corpus}' not found. Attempting to download...\n")
+        sys.stderr.flush()
+        try:
+            # Attempt to download
+            nltk.download(corpus)
+            sys.stdout.write(f"PROGRESS: NLTK resource '{corpus}' downloaded successfully.\n")
+            sys.stdout.flush()
+        except Exception as e:
+            # If download fails, print a critical error and exit
+            sys.stderr.write(f"CRITICAL ERROR: Failed to download NLTK resource '{corpus}'. Please ensure you have internet access and run 'python -c \"import nltk; nltk.download(\'{corpus}\")\"' manually. Error: {e}\n")
+            sys.stderr.flush()
+            sys.exit(1) # Exit with a non-zero code to indicate failure to Node.js
 
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
@@ -47,6 +63,8 @@ def infer_university_type(text):
     return 'unknown'
 
 def prepare_training_data():
+    sys.stdout.write("PROGRESS: Preparing training data for sentiment models.\n")
+    sys.stdout.flush()
     documents = [(list(movie_reviews.words(fileid)), category)
                  for category in movie_reviews.categories()
                  for fileid in movie_reviews.fileids(category)]
@@ -153,6 +171,8 @@ X_train = vectorizer.fit_transform(train_df['cleaned_text'])
 y_train = train_df['sentiment']
 X_train_split, X_val, y_train_split, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
+sys.stdout.write("PROGRESS: Training SVM model...\n")
+sys.stdout.flush()
 svm_model = SVC(kernel='linear', probability=True)
 svm_model.fit(X_train_split, y_train_split)
 svm_val_predictions = svm_model.predict(X_val)
@@ -167,7 +187,11 @@ svm_model_metrics = {
     "negative_recall": round(svm_metrics_report['negative']['recall'], 4),
     "negative_f1_score": round(svm_metrics_report['negative']['f1-score'], 4)
 }
+sys.stdout.write("PROGRESS: SVM model trained.\n")
+sys.stdout.flush()
 
+sys.stdout.write("PROGRESS: Training Random Forest model...\n")
+sys.stdout.flush()
 rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
 rf_model.fit(X_train_split, y_train_split)
 rf_val_predictions = rf_model.predict(X_val)
@@ -182,10 +206,15 @@ rf_model_metrics = {
     "negative_recall": round(rf_metrics_report['negative']['recall'], 4),
     "negative_f1_score": round(rf_metrics_report['negative']['f1-score'], 4)
 }
+sys.stdout.write("PROGRESS: Random Forest model trained.\n")
+sys.stdout.flush()
+
 
 def process_data(df, is_csv_input, excel_output_dir, chart_output_dir):
     infra_summary = pd.DataFrame() # Initialize as empty
 
+    sys.stdout.write("PROGRESS: Preprocessing input data...\n")
+    sys.stdout.flush()
     if is_csv_input:
         opinion_columns = [col for col in df.columns if col.startswith('My school')]
         infra_columns = [col for col in df.columns if 'How accessible is this infrastructure' in col]
@@ -203,12 +232,18 @@ def process_data(df, is_csv_input, excel_output_dir, chart_output_dir):
         df = df[df['university_type'] != 'unknown']
 
     df['cleaned_text'] = df['text'].apply(preprocess_text)
+    sys.stdout.write("PROGRESS: Input data preprocessed.\n")
+    sys.stdout.flush()
 
     # Only proceed with sentiment prediction if there's data left after filtering
     if not df.empty:
+        sys.stdout.write("PROGRESS: Applying sentiment predictions...\n")
+        sys.stdout.flush()
         X_test = vectorizer.transform(df['cleaned_text'])
         df['sentiment_svm'] = svm_model.predict(X_test)
         df['sentiment_rf'] = rf_model.predict(X_test)
+        sys.stdout.write("PROGRESS: Sentiment predictions applied.\n")
+        sys.stdout.flush()
 
         sentiment_summary = df.groupby(['university_type', 'sentiment_rf']).size().unstack(fill_value=0)
         sentiment_summary['total'] = sentiment_summary.sum(axis=1)
@@ -216,10 +251,15 @@ def process_data(df, is_csv_input, excel_output_dir, chart_output_dir):
             sentiment_summary[f'{sentiment}_percent'] = (sentiment_summary.get(sentiment, 0) / sentiment_summary['total'] * 100).round(2)
     else:
         sentiment_summary = pd.DataFrame() # Empty if no valid data
+        sys.stdout.write("WARNING: No valid data found for sentiment analysis after filtering.\n")
+        sys.stdout.flush()
 
-    chart_image_filename = 'sentiment_distribution.png' # Fixed name for easy access in Node.js
+
+    chart_image_filename = f'sentiment_distribution_{uuid.uuid4()}.png' # Unique name for chart
     chart_image_path = os.path.join(chart_output_dir, chart_image_filename)
 
+    sys.stdout.write("PROGRESS: Generating sentiment distribution chart...\n")
+    sys.stdout.flush()
     # Save sentiment distribution plot
     plt.figure(figsize=(10, 6))
     if not sentiment_summary.empty:
@@ -238,12 +278,18 @@ def process_data(df, is_csv_input, excel_output_dir, chart_output_dir):
         plt.tight_layout()
         plt.savefig(chart_image_path)
         plt.close()
+        sys.stdout.write(f"PROGRESS: Chart saved to {chart_image_path}\n")
+        sys.stdout.flush()
     else:
-        print("No valid data for plotting after filtering.", file=sys.stderr) # Send to stderr for Node.js logging
+        sys.stdout.write("WARNING: No valid data for plotting sentiment distribution.\n")
+        sys.stdout.flush()
+        chart_image_filename = "" # No chart generated if no data
 
     # Convert summaries to dictionary for JSON output
     sentiment_summary_dict = sentiment_summary.to_dict(orient='index') if not sentiment_summary.empty else {}
     infra_summary_dict = infra_summary.to_dict(orient='index') if not infra_summary.empty else {}
+    sys.stdout.write("PROGRESS: Summaries prepared.\n")
+    sys.stdout.flush()
 
     return df, sentiment_summary_dict, infra_summary_dict, chart_image_filename
 
@@ -255,11 +301,6 @@ if __name__ == '__main__':
     chart_output_dir = None
 
     # Parse command-line arguments
-    # sys.argv[0] is script name
-    # sys.argv[1] is input_file_path
-    # sys.argv[2] is 'csv' or 'other'
-    # sys.argv[3] is excel_output_dir
-    # sys.argv[4] is chart_output_dir
     if len(sys.argv) > 4:
         input_file_path = sys.argv[1]
         is_csv_input_type = (sys.argv[2] == 'csv')
@@ -267,26 +308,36 @@ if __name__ == '__main__':
         chart_output_dir = sys.argv[4]
     else:
         # Fallback for direct testing or if not called from Node.js with all args
-        print("Warning: Insufficient command-line arguments. Using sample data and default output paths.", file=sys.stderr)
-        excel_output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'analysis_results', 'analysis_files')
-        chart_output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'analysis_results', 'images')
+        sys.stderr.write("WARNING: Insufficient command-line arguments. Using sample data and default output paths.\n")
+        sys.stderr.flush()
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        app_root = os.path.dirname(script_dir) # Go up one level from python_script
+        excel_output_dir = os.path.join(app_root, 'analysis_results', 'analysis_files')
+        chart_output_dir = os.path.join(app_root, 'analysis_results', 'images')
         os.makedirs(excel_output_dir, exist_ok=True)
         os.makedirs(chart_output_dir, exist_ok=True)
+
 
     df_to_process = None
     if input_file_path and os.path.exists(input_file_path):
         try:
             df_to_process = pd.read_csv(input_file_path)
-            if is_csv_input_type and not all(col in df_to_process.columns for col in ['Timestamp', 'Kind of University']):
-                print(f"CSV file '{os.path.basename(input_file_path)}' missing 'Timestamp' or 'Kind of University' columns. Using sample X posts dataset.", file=sys.stderr)
+            # Check for expected columns for CSV type
+            if is_csv_input_type and not all(col in df_to_process.columns for col in ['Timestamp', 'Kind of University', 'My school infrastructure is good']): # Added an opinion col check
+                sys.stderr.write(f"WARNING: CSV file '{os.path.basename(input_file_path)}' missing expected columns ('Timestamp', 'Kind of University', 'My school infrastructure is good', etc.). Using sample X posts dataset.\n")
+                sys.stderr.flush()
                 df_to_process = sample_data
                 is_csv_input_type = False
+            sys.stdout.write("PROGRESS: Input file loaded successfully.\n")
+            sys.stdout.flush()
         except Exception as e:
-            print(f"Error loading uploaded CSV: {e}. Using sample X posts dataset.", file=sys.stderr)
+            sys.stderr.write(f"ERROR: Failed to load uploaded CSV file: {e}. Using sample X posts dataset.\n")
+            sys.stderr.flush()
             df_to_process = sample_data
             is_csv_input_type = False
     else:
-        print("No valid input file provided or file not found. Using sample X posts dataset.", file=sys.stderr)
+        sys.stderr.write("WARNING: No valid input file provided or file not found. Using sample X posts dataset.\n")
+        sys.stderr.flush()
         df_to_process = sample_data
         is_csv_input_type = False
 
@@ -297,16 +348,22 @@ if __name__ == '__main__':
         chart_output_dir
     )
 
-    output_excel_filename = f'analysis_result_{uuid.uuid4()}.xlsx' # Changed prefix for clarity
+    output_excel_filename = f'analysis_result_{uuid.uuid4()}.xlsx'
     output_file_path = os.path.join(excel_output_dir, output_excel_filename)
 
+    sys.stdout.write("PROGRESS: Saving analysis results to Excel...\n")
+    sys.stdout.flush()
     with pd.ExcelWriter(output_file_path, engine='openpyxl') as writer:
+        # Determine which columns to save based on input type
         if is_csv_input_type:
+            # Include 'Kind of University' for actual CSV uploads
             cols_to_save = ['Timestamp', 'Username', 'Kind of University', 'text', 'university_type', 'sentiment_svm', 'sentiment_rf']
-            # Filter columns that exist in the DataFrame
-            df_processed[df_processed.columns.intersection(cols_to_save)].to_excel(writer, sheet_name='Raw_Data', index=False)
+            df_to_save = df_processed[df_processed.columns.intersection(cols_to_save)]
+            df_to_save.to_excel(writer, sheet_name='Raw_Data', index=False)
         else:
+            # For sample_data or generic "other" input, use its specific columns
             df_processed[['created_at', 'username', 'text', 'university_type', 'sentiment_svm', 'sentiment_rf']].to_excel(writer, sheet_name='Raw_Data', index=False)
+
 
         if sentiment_summary_dict: # Only save if not empty
             sentiment_summary_df = pd.DataFrame.from_dict(sentiment_summary_dict, orient='index')
@@ -316,6 +373,8 @@ if __name__ == '__main__':
             infra_summary_df = pd.DataFrame.from_dict(infra_summary_dict, orient='index')
             infra_summary_df.index.name = 'university_type' # Set index name
             infra_summary_df.to_excel(writer, sheet_name='Infrastructure_Summary')
+    sys.stdout.write(f"PROGRESS: Excel file saved to {output_file_path}\n")
+    sys.stdout.flush()
 
     # Prepare final output for Node.js in JSON format
     final_output = {
@@ -329,6 +388,5 @@ if __name__ == '__main__':
         }
     }
     # Print JSON to stdout for Node.js to capture
-    print(json.dumps(final_output))
-
+    sys.stdout.write(json.dumps(final_output) + "\n") # Add newline for cleaner capture
     sys.stdout.flush() # Ensure all output is sent before exiting
